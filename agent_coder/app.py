@@ -5,7 +5,7 @@ from typing import List, Dict
 import streamlit as st
 
 from llm import GPT4AllClient
-from file_paths import get_android_project_file_map, read_file_safely
+from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template
 from ui_utils import build_user_prompt
 
 
@@ -66,6 +66,20 @@ def main():
     with col_right:
         st.subheader("Project")
         project_name = st.text_input("project_name", value="my_project")
+        base_template_dir = st.text_input(
+            "Base template directory",
+            value="/workspace/Empty_Activity_android_studio_base_template",
+            help="Will never be modified. A copy will be created under /workspace/output_projects/{project_name}",
+        )
+        if st.button("Create project from base (copy)"):
+            created, dest_dir, msg = scaffold_project_from_template(
+                project_name=project_name,
+                base_template_dir=base_template_dir,
+            )
+            if created:
+                st.success(msg)
+            else:
+                st.warning(msg)
         file_map = get_android_project_file_map(project_name)
         filenames: List[str] = list(file_map.keys())
         selected_filename = st.selectbox("Target file", options=filenames, index=0 if filenames else 0)
@@ -129,7 +143,7 @@ def main():
             progress.write("✅ Done")
 
     st.markdown("---")
-    st.caption("Place your GGUF models under the selected models directory. Code blocks are fenced for clarity.")
+    st.caption("Place your GGUF models under the selected models directory. Base template is never modified; new projects are copies.")
 
 
 if __name__ == "__main__":
