@@ -6,7 +6,7 @@ from PySide6.QtGui import QAction, QDesktopServices, QTextCursor
 
 from llm import GPT4AllClient
 from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template, _project_root
-from ui_utils import build_user_prompt
+from ui_utils import build_user_prompt, build_multi_file_prompt
 
 
 class LLMWorker(QtCore.QObject):
@@ -114,6 +114,10 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.file_preview.setReadOnly(True)
 		self.file_preview.setFixedHeight(220)
 
+		self.include_all_checkbox = QtWidgets.QCheckBox("Include all 4 files in prompt")
+		self.apply_button = QtWidgets.QPushButton("Apply Edits from last response")
+		self.apply_button.clicked.connect(self.on_apply_clicked)
+
 		# Wire signals
 		self.models_dir_edit.editingFinished.connect(self._on_models_dir_changed)
 		self.model_combo.currentIndexChanged.connect(self._on_model_selected)
@@ -133,6 +137,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		right.addRow("Target file", self.file_combo)
 		right.addRow("Path", self.file_path_label)
 		right.addRow("Preview", self.file_preview)
+		right.addRow(self.include_all_checkbox)
+		right.addRow(self.apply_button)
 
 		layout.addLayout(left, 2)
 		layout.addLayout(right, 1)
@@ -188,7 +194,14 @@ class MainWindow(QtWidgets.QMainWindow):
 		filename = self.file_combo.currentText()
 		file_path = self.file_map.get(filename, "")
 		file_content = read_file_safely(file_path)
-		prompt = build_user_prompt(filename, file_content, user_text)
+		if self.include_all_checkbox.isChecked():
+			# Build multi-file map with current project files
+			fname_to_content: Dict[str, str] = {}
+			for fname, fpath in self.file_map.items():
+				fname_to_content[fname] = read_file_safely(fpath)
+			prompt = build_multi_file_prompt(fname_to_content, user_text)
+		else:
+			prompt = build_user_prompt(filename, file_content, user_text)
 
 		# Reset UI
 		self.chat_view.append("<b>User:</b> " + QtWidgets.QApplication.translate("", user_text))
@@ -222,6 +235,68 @@ class MainWindow(QtWidgets.QMainWindow):
 		self._worker.finished.connect(self._worker.deleteLater)
 		self._thread.finished.connect(self._thread.deleteLater)
 		self._thread.start()
+
+	def on_apply_clicked(self) -> None:
+		# Parse the last assistant message and apply edits to files (backup originals)
+		if not hasattr(self, "file_map"):
+			return
+		# find last assistant message from the chat_view
+		text = self.chat_view.toPlainText()
+		if not text:
+			QtWidgets.QMessageBox.information(self, "Apply", "No assistant response to parse.")
+			return
+		applied_count = self._apply_edits_from_text(text)
+		QtWidgets.QMessageBox.information(self, "Apply", f"Applied edits to {applied_count} file(s).")
+		self._on_file_selected()
+
+	def _apply_edits_from_text(self, text: str) -> int:
+		# Very simple parser expecting sections like:
+		# File: AndroidManifest.xml\n```xml\n...\n```  OR File: MainActivity.kt\n```kotlin\n...\n```
+		count = 0
+		lines = text.splitlines()
+		current_file = None
+		collecting = False
+		buffer: List[str] = []
+		for line in lines:
+			if line.strip().startswith("File:"):
+				# flush previous
+				if current_file and buffer:
+					if self._write_file_if_target(current_file, "\n".join(buffer)):
+						count += 1
+				buffer = []
+				current_file = line.split(":", 1)[1].strip()
+				collecting = False
+			elif line.strip().startswith("```"):
+				if not collecting:
+					collecting = True
+					buffer = []
+				else:
+					collecting = False
+			elif collecting:
+				buffer.append(line)
+		# flush last
+		if current_file and buffer:
+			if self._write_file_if_target(current_file, "\n".join(buffer)):
+				count += 1
+		return count
+
+	def _write_file_if_target(self, filename: str, content: str) -> bool:
+		# Only write if filename matches our 4 targets
+		if filename not in self.file_map:
+			return False
+		path = self.file_map[filename]
+		# backup
+		try:
+			if os.path.exists(path):
+				backup_path = path + ".bak"
+				with open(backup_path, "w", encoding="utf-8") as b:
+					b.write(read_file_safely(path))
+			with open(path, "w", encoding="utf-8") as f:
+				f.write(content)
+			return True
+		except Exception as exc:
+			QtWidgets.QMessageBox.critical(self, "Write error", f"{filename}: {exc}")
+			return False
 
 	def _open_models_dir(self) -> None:
 		path = self.models_dir_edit.text().strip()
