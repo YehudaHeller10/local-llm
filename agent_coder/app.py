@@ -68,7 +68,7 @@ def main():
         project_name = st.text_input("project_name", value="my_project")
         base_template_dir = st.text_input(
             "Base template directory",
-            value="/workspace/Empty_Activity_android_studio_base_template",
+            value="/workspace/agent_coder/Empty_Activity_android_studio_base_template",
             help="Will never be modified. A copy will be created under /workspace/output_projects/{project_name}",
         )
         if st.button("Create project from base (copy)"):

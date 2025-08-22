@@ -13,7 +13,7 @@ Minimal, clean GUI to interact with GPT4All (GGUF models), stream responses, and
 ## Prerequisites
 - Python 3.10+
 - GGUF models placed in `./models` (or configure a custom models path in the UI)
-- An Android base template directory (e.g. `/workspace/Empty_Activity_android_studio_base_template`)
+- An Android base template directory (default: `/workspace/agent_coder/Empty_Activity_android_studio_base_template`)
 
 ## Install
 ```bash
@@ -27,7 +27,7 @@ streamlit run app.py
 
 ## Usage
 1. Put your GGUF models under `./models`.
-2. Enter `project_name` and set `Base template directory`.
+2. Enter `project_name` and keep `Base template directory` as `/workspace/agent_coder/Empty_Activity_android_studio_base_template` (or change if needed).
 3. Click "Create project from base (copy)". This creates `/workspace/output_projects/{project_name}` without touching the base template.
 4. Choose one of the target files. The app will read its content from:
    - `/workspace/output_projects/{project_name}/app/src/main/java/com/example/empty_activity_android_studio_base_template/MainActivity.kt`
