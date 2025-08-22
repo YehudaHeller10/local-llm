@@ -80,6 +80,15 @@ class MainWindow(QtWidgets.QMainWindow):
 		send_btn = QtWidgets.QPushButton("Send")
 		send_btn.clicked.connect(self.on_send_clicked)
 
+		# Simple mode controls for non-technical users
+		self.simple_mode_checkbox = QtWidgets.QCheckBox("Simple Mode (No-Code)")
+		self.simple_prompt = QtWidgets.QPlainTextEdit()
+		self.simple_prompt.setPlaceholderText("Describe the app you want (e.g., a notes app with add/list/delete)...")
+		self.simple_prompt.setFixedHeight(100)
+		self.simple_start_btn = QtWidgets.QPushButton("Build Android App")
+		self.simple_start_btn.setStyleSheet("font-weight: bold; padding: 8px 12px;")
+		self.simple_start_btn.clicked.connect(self.on_agent_auto)
+
 		left.addWidget(QtWidgets.QLabel("Chat"))
 		left.addWidget(self.chat_view, 1)
 		left.addWidget(self.progress_label)
@@ -87,6 +96,10 @@ class MainWindow(QtWidgets.QMainWindow):
 		left_io.addWidget(self.input_line, 1)
 		left_io.addWidget(send_btn)
 		left.addLayout(left_io)
+		left.addWidget(QtWidgets.QLabel(""))
+		left.addWidget(self.simple_mode_checkbox)
+		left.addWidget(self.simple_prompt)
+		left.addWidget(self.simple_start_btn)
 
 		# Right: Controls
 		right = QtWidgets.QFormLayout()
@@ -153,12 +166,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.agent_status = QtWidgets.QTextBrowser()
 		self.agent_status.setFixedHeight(180)
 		self.agent_spinner = QtWidgets.QLabel("⏳ Idle")
+		self.agent_progress = QtWidgets.QProgressBar()
+		self.agent_progress.setRange(0, 6)
+		self.agent_progress.setValue(0)
 		self.agent_run_button = QtWidgets.QPushButton("Run Agent (JSON-based)")
 		self.agent_run_button.clicked.connect(self.on_agent_run)
 		self.agent_auto_button = QtWidgets.QPushButton("Auto-Run (Scaffold → Plan → Generate → QA)")
 		self.agent_auto_button.clicked.connect(self.on_agent_auto)
 		agent_layout.addWidget(self.agent_status)
 		agent_layout.addWidget(self.agent_spinner)
+		agent_layout.addWidget(self.agent_progress)
 		agent_layout.addWidget(self.agent_run_button)
 		agent_layout.addWidget(self.agent_auto_button)
 		layout.addWidget(agent_panel, 0)
@@ -396,7 +413,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		if not model_name:
 			QtWidgets.QMessageBox.warning(self, "Agent", "Please select a model")
 			return
-		goal = self.input_line.text().strip() or "Create a simple Android app with a button and a toast."
+		goal = (self.simple_prompt.toPlainText().strip() if self.simple_mode_checkbox.isChecked() else self.input_line.text().strip()) or "Create a simple Android app with a button and a toast."
 		# preload
 		try:
 			self.client.load_model(model_name, verbose=False)
@@ -405,7 +422,9 @@ class MainWindow(QtWidgets.QMainWindow):
 			return
 		self.agent_spinner.setText("🔄 Running auto pipeline...")
 		self.agent_status.clear()
+		self.agent_progress.setValue(0)
 		agent = AndroidAgent(models_dir=self.client.models_dir)
+		agent.preload_model(model_name)
 
 		def on_status(msg: str) -> None:
 			self.agent_status.append(msg)
@@ -425,6 +444,9 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.agent_status.append(f"✓ {text}")
 			self.agent_status.moveCursor(QTextCursor.End)
 			self._on_file_selected()
+			# advance progress
+			val = min(self.agent_progress.value() + 1, self.agent_progress.maximum())
+			self.agent_progress.setValue(val)
 
 		agent.run_autonomous(
 			project_name=project_name,
@@ -440,6 +462,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 def main() -> None:
+	# Prefer CPU-only to avoid CUDA DLL warnings on Windows
+	os.environ.setdefault("GGML_NO_CUDA", "1")
+	os.environ.setdefault("GGML_CUDA", "0")
+	try:
+		import multiprocessing
+		os.environ.setdefault("GGML_NUM_THREADS", str(max(1, multiprocessing.cpu_count() - 0)))
+	except Exception:
+		pass
 	app = QtWidgets.QApplication([])
 	w = MainWindow()
 	w.show()
