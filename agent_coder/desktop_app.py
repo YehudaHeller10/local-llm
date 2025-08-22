@@ -155,9 +155,12 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.agent_spinner = QtWidgets.QLabel("⏳ Idle")
 		self.agent_run_button = QtWidgets.QPushButton("Run Agent (JSON-based)")
 		self.agent_run_button.clicked.connect(self.on_agent_run)
+		self.agent_auto_button = QtWidgets.QPushButton("Auto-Run (Scaffold → Plan → Generate → QA)")
+		self.agent_auto_button.clicked.connect(self.on_agent_auto)
 		agent_layout.addWidget(self.agent_status)
 		agent_layout.addWidget(self.agent_spinner)
 		agent_layout.addWidget(self.agent_run_button)
+		agent_layout.addWidget(self.agent_auto_button)
 		layout.addWidget(agent_panel, 0)
 
 	def _refresh_models(self) -> None:
@@ -385,6 +388,55 @@ class MainWindow(QtWidgets.QMainWindow):
 		agent.write_outputs(project_name, outputs)
 		self.agent_spinner.setText("✅ Done")
 		self._on_file_selected()
+
+	def on_agent_auto(self) -> None:
+		project_name = self.project_name_edit.text().strip() or "my_project"
+		base_dir = self.base_template_edit.text().strip()
+		model_name = self.model_combo.currentText().strip()
+		if not model_name:
+			QtWidgets.QMessageBox.warning(self, "Agent", "Please select a model")
+			return
+		goal = self.input_line.text().strip() or "Create a simple Android app with a button and a toast."
+		# preload
+		try:
+			self.client.load_model(model_name, verbose=False)
+		except Exception as exc:
+			QtWidgets.QMessageBox.critical(self, "Agent", f"Model load failed: {exc}")
+			return
+		self.agent_spinner.setText("🔄 Running auto pipeline...")
+		self.agent_status.clear()
+		agent = AndroidAgent(models_dir=self.client.models_dir)
+
+		def on_status(msg: str) -> None:
+			self.agent_status.append(msg)
+			self.agent_status.moveCursor(QTextCursor.End)
+
+		def on_stage_done(stage: str) -> None:
+			labels = {
+				"scaffold": "Copying base template",
+				"plan": "Creating app plan",
+				"build.gradle.kts": "Creating build settings",
+				"AndroidManifest.xml": "Creating manifest",
+				"activity_main.xml": "Creating app layout",
+				"MainActivity.kt": "Creating main functionality",
+				"qa": "Running QA checks",
+			}
+			text = labels.get(stage, stage)
+			self.agent_status.append(f"✓ {text}")
+			self.agent_status.moveCursor(QTextCursor.End)
+			self._on_file_selected()
+
+		agent.run_autonomous(
+			project_name=project_name,
+			base_template_dir=base_dir,
+			system_prompt=self.system_prompt_edit.toPlainText(),
+			user_goal=goal,
+			max_tokens=int(self.max_tokens_spin.value()),
+			temp=float(self.temp_spin.value()),
+			on_status=on_status,
+			on_stage_done=on_stage_done,
+		)
+		self.agent_spinner.setText("✅ Done")
 
 
 def main() -> None:
