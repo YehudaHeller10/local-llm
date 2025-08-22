@@ -4,7 +4,7 @@ from typing import List, Dict
 from PySide6 import QtCore, QtWidgets
 
 from llm import GPT4AllClient
-from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template
+from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template, _project_root
 from ui_utils import build_user_prompt
 
 
@@ -47,17 +47,25 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setWindowTitle("Agent Coder (GPT4All) - Desktop")
 		self.resize(1100, 720)
 
-		self.client = GPT4AllClient(models_dir="./models")
+		root = _project_root()
+		self.client = GPT4AllClient(models_dir=os.path.join(root, "models"))
 		self._thread: QtCore.QThread | None = None
 		self._worker: LLMWorker | None = None
 
-		self._build_ui()
+		self._build_ui(root)
 		self._refresh_models()
 		self._update_file_map()
 
-	def _build_ui(self) -> None:
+	def _build_ui(self, root: str) -> None:
 		central = QtWidgets.QWidget()
 		layout = QtWidgets.QHBoxLayout(central)
+
+		# Menu
+		menubar = self.menuBar()
+		file_menu = menubar.addMenu("File")
+		open_models_action = QtWidgets.QAction("Open models folder", self)
+		open_models_action.triggered.connect(self._open_models_dir)
+		file_menu.addAction(open_models_action)
 
 		# Left: Chat area
 		left = QtWidgets.QVBoxLayout()
@@ -80,7 +88,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# Right: Controls
 		right = QtWidgets.QFormLayout()
-		self.models_dir_edit = QtWidgets.QLineEdit("./models")
+		self.models_dir_edit = QtWidgets.QLineEdit(os.path.join(root, "models"))
 		self.model_combo = QtWidgets.QComboBox()
 		self.temp_spin = QtWidgets.QDoubleSpinBox()
 		self.temp_spin.setRange(0.0, 1.2)
@@ -94,7 +102,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.system_prompt_edit.setFixedHeight(90)
 
 		self.project_name_edit = QtWidgets.QLineEdit("my_project")
-		self.base_template_edit = QtWidgets.QLineEdit("/workspace/agent_coder/Empty_Activity_android_studio_base_template")
+		self.base_template_edit = QtWidgets.QLineEdit(os.path.join(root, "Empty_Activity_android_studio_base_template"))
 		self.copy_btn = QtWidgets.QPushButton("Create project from base (copy)")
 		self.copy_btn.clicked.connect(self.on_copy_clicked)
 
@@ -213,6 +221,11 @@ class MainWindow(QtWidgets.QMainWindow):
 		self._worker.finished.connect(self._worker.deleteLater)
 		self._thread.finished.connect(self._thread.deleteLater)
 		self._thread.start()
+
+	def _open_models_dir(self) -> None:
+		path = self.models_dir_edit.text().strip()
+		QtGui = QtWidgets.QDesktopServices
+		QtGui.openUrl(QtCore.QUrl.fromLocalFile(path))
 
 	@QtCore.Slot(str)
 	def _on_chunk(self, token: str) -> None:

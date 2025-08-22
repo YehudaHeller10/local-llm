@@ -1,9 +1,20 @@
 import os
 import shutil
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 
-def get_android_project_file_map(project_name: str, root: str = "/workspace/output_projects") -> Dict[str, str]:
+def _project_root() -> str:
+	# Directory containing this file is inside the project; use its parent as root
+	return os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
+
+
+def _default_output_root() -> str:
+	return os.path.join(_project_root(), "output_projects")
+
+
+def get_android_project_file_map(project_name: str, root: Optional[str] = None) -> Dict[str, str]:
+	if root is None:
+		root = _default_output_root()
 	project_root = os.path.join(root, project_name)
 
 	return {
@@ -55,15 +66,18 @@ def read_file_safely(file_path: str) -> str:
 def scaffold_project_from_template(
 	project_name: str,
 	base_template_dir: str,
-	output_root: str = "/workspace/output_projects",
+	output_root: Optional[str] = None,
 ) -> Tuple[bool, str, str]:
 	"""
 	Create a new project directory by copying from base_template_dir to
-	/workspace/output_projects/{project_name} if it does not already exist.
+	{project_root}/output_projects/{project_name} if it does not already exist.
 	Never modify the base template. Returns (created, dest_dir, message).
 	"""
 	if not os.path.isdir(base_template_dir):
 		return False, "", f"Base template not found: {base_template_dir}"
+
+	if output_root is None:
+		output_root = _default_output_root()
 
 	dest_dir = os.path.join(output_root, project_name)
 	# Guard: never allow selecting the template dir itself as destination
