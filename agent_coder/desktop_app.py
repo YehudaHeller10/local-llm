@@ -115,6 +115,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.file_preview.setFixedHeight(220)
 
 		self.include_all_checkbox = QtWidgets.QCheckBox("Include all 4 files in prompt")
+		self.lite_mode_checkbox = QtWidgets.QCheckBox("Lite mode (single-file prompt, faster)")
 		self.apply_button = QtWidgets.QPushButton("Apply Edits from last response")
 		self.apply_button.clicked.connect(self.on_apply_clicked)
 
@@ -138,6 +139,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		right.addRow("Path", self.file_path_label)
 		right.addRow("Preview", self.file_preview)
 		right.addRow(self.include_all_checkbox)
+		right.addRow(self.lite_mode_checkbox)
 		right.addRow(self.apply_button)
 
 		layout.addLayout(left, 2)
@@ -149,13 +151,28 @@ class MainWindow(QtWidgets.QMainWindow):
 		models = self.client.list_local_models()
 		self.model_combo.clear()
 		self.model_combo.addItems(models)
+		# Preselect first
+		if models:
+			self.model_combo.setCurrentIndex(0)
+			self._preload_model_if_available()
 
 	def _on_models_dir_changed(self) -> None:
 		self._refresh_models()
 
 	def _on_model_selected(self) -> None:
-		# lazy load on send
-		pass
+		self._preload_model_if_available()
+
+	def _preload_model_if_available(self) -> None:
+		model_name = self.model_combo.currentText().strip()
+		if not model_name:
+			return
+		try:
+			self.progress_label.setText(f"🧠 Preloading model: {model_name}...")
+			self.client.load_model(model_name, verbose=False)
+			self.progress_label.setText("Model ready ✅")
+		except Exception as exc:
+			self.progress_label.setText("")
+			QtWidgets.QMessageBox.warning(self, "Model preload", f"Failed to preload {model_name}: {exc}")
 
 	def _update_file_map(self) -> None:
 		project_name = self.project_name_edit.text().strip()
@@ -194,7 +211,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		filename = self.file_combo.currentText()
 		file_path = self.file_map.get(filename, "")
 		file_content = read_file_safely(file_path)
-		if self.include_all_checkbox.isChecked():
+		if (self.include_all_checkbox.isChecked() and not self.lite_mode_checkbox.isChecked()):
 			# Build multi-file map with current project files
 			fname_to_content: Dict[str, str] = {}
 			for fname, fpath in self.file_map.items():

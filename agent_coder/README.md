@@ -4,6 +4,8 @@ Minimal, clean Desktop GUI (PySide6) to interact with GPT4All (GGUF models), str
 
 ## Features
 - Model selection from local `models` directory
+- Model preload on startup/selection to reduce first-token latency
+- Lite mode (single-file prompt) for faster responses
 - Live token streaming with clear progress indicators
 - Simple architecture: a few Python files only
 - Targets specific Android files under `<project_root>/output_projects/{project_name}`
@@ -37,9 +39,13 @@ If using the provided Linux venv:
    - `<project_root>/output_projects/{project_name}/app/src/main/res/layout/activity_main.xml`
    - `<project_root>/output_projects/{project_name}/app/src/main/AndroidManifest.xml`
    - `<project_root>/output_projects/{project_name}/app/build.gradle.kts`
-5. Type your request and click Send. The app streams the response into the chat area.
+5. For faster first token: leave "Lite mode" checked (single-file prompt) and rely on "Include all 4 files" only when necessary.
+6. Type your request and click Send. The app streams the response into the chat area.
+7. Click "Apply Edits from last response" to write updates (with `.bak` backups) to the project files.
 
-## Notes
-- The base template is never modified. New projects are copied into `<project_root>/output_projects`.
-- You can override the system prompt.
-- This project is intentionally minimal and easy to copy to a new directory.
+## Tips for performance
+- Use smaller GGUF (e.g., q4_k_m). Keep models on a fast local drive.
+- Environment (Windows PowerShell):
+  - `$env:GGML_NUM_THREADS = [Environment]::ProcessorCount`
+  - `$env:GGML_NO_CUDA = 1; $env:GGML_CUDA = 0`
+- Keep `models` and `output_projects` on the same fast disk.
