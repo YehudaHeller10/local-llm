@@ -2,6 +2,7 @@ import os
 from typing import List, Dict
 
 from PySide6 import QtCore, QtWidgets
+from PySide6.QtGui import QAction, QDesktopServices
 
 from llm import GPT4AllClient
 from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template, _project_root
@@ -63,7 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		# Menu
 		menubar = self.menuBar()
 		file_menu = menubar.addMenu("File")
-		open_models_action = QtWidgets.QAction("Open models folder", self)
+		open_models_action = QAction("Open models folder", self)
 		open_models_action.triggered.connect(self._open_models_dir)
 		file_menu.addAction(open_models_action)
 
@@ -224,8 +225,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	def _open_models_dir(self) -> None:
 		path = self.models_dir_edit.text().strip()
-		QtGui = QtWidgets.QDesktopServices
-		QtGui.openUrl(QtCore.QUrl.fromLocalFile(path))
+		QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(path))
 
 	@QtCore.Slot(str)
 	def _on_chunk(self, token: str) -> None:
