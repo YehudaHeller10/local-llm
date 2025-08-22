@@ -1,4 +1,4 @@
-# Agent Coder (GPT4All + Streamlit)
+# Agent Coder (GPT4All + Streamlit + Desktop)
 
 Minimal, clean GUI to interact with GPT4All (GGUF models), stream responses, and send Android project file contents per selected `project_name`.
 
@@ -9,20 +9,30 @@ Minimal, clean GUI to interact with GPT4All (GGUF models), stream responses, and
 - Simple architecture: a few Python files only
 - Targets specific Android files under `/workspace/output_projects/{project_name}`
 - Safe scaffolding: always works on a copy of the base template
+- Desktop GUI (PySide6) and Web (Streamlit)
 
 ## Prerequisites
 - Python 3.10+
 - GGUF models placed in `./models` (or configure a custom models path in the UI)
-- An Android base template directory (default: `/workspace/agent_coder/Empty_Activity_android_studio_base_template`)
+- Base template directory at `/workspace/agent_coder/Empty_Activity_android_studio_base_template`
 
 ## Install
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-## Run
+## Run - Web (Streamlit)
 ```bash
 streamlit run app.py
+```
+
+## Run - Desktop (PySide6)
+```bash
+python desktop_app.py
+```
+If you are using the provided virtual environment:
+```bash
+/workspace/agent_coder/.venv/bin/python /workspace/agent_coder/desktop_app.py
 ```
 
 ## Usage
@@ -38,6 +48,6 @@ streamlit run app.py
 
 ## Notes
 - The base template is never modified. New projects are copied into `/workspace/output_projects`.
-- Responses are rendered as markdown. Code is shown in fenced code blocks.
-- You can override the system prompt in the sidebar.
+- Responses are rendered as markdown (web). Desktop app displays streaming text; for formatted code blocks, copy output as needed.
+- You can override the system prompt.
 - This project is intentionally minimal and easy to copy to a new directory.
