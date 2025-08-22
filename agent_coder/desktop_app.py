@@ -2,7 +2,7 @@ import os
 from typing import List, Dict
 
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices, QTextCursor
 
 from llm import GPT4AllClient
 from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template, _project_root
@@ -229,11 +229,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	@QtCore.Slot(str)
 	def _on_chunk(self, token: str) -> None:
-		# Append token to last assistant line
-		cursor = self.chat_view.textCursor()
-		cursor.movePosition(cursor.End)
-		cursor.insertText(token)
-		self.chat_view.setTextCursor(cursor)
+		# Append token to the end of the assistant message
+		self.chat_view.moveCursor(QTextCursor.End)
+		self.chat_view.insertPlainText(token)
+		self.chat_view.moveCursor(QTextCursor.End)
 		self.chat_view.ensureCursorVisible()
 
 	@QtCore.Slot()
