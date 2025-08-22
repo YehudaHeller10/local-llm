@@ -7,6 +7,7 @@ from PySide6.QtGui import QAction, QDesktopServices, QTextCursor
 from llm import GPT4AllClient
 from file_paths import get_android_project_file_map, read_file_safely, scaffold_project_from_template, _project_root
 from ui_utils import build_user_prompt, build_multi_file_prompt
+from agent_tool import AndroidAgent
 
 
 class LLMWorker(QtCore.QObject):
@@ -145,6 +146,19 @@ class MainWindow(QtWidgets.QMainWindow):
 		layout.addLayout(left, 2)
 		layout.addLayout(right, 1)
 		self.setCentralWidget(central)
+
+		# Agent panel at bottom
+		agent_panel = QtWidgets.QGroupBox("Android Agent Developer")
+		agent_layout = QtWidgets.QVBoxLayout(agent_panel)
+		self.agent_status = QtWidgets.QTextBrowser()
+		self.agent_status.setFixedHeight(180)
+		self.agent_spinner = QtWidgets.QLabel("⏳ Idle")
+		self.agent_run_button = QtWidgets.QPushButton("Run Agent (JSON-based)")
+		self.agent_run_button.clicked.connect(self.on_agent_run)
+		agent_layout.addWidget(self.agent_status)
+		agent_layout.addWidget(self.agent_spinner)
+		agent_layout.addWidget(self.agent_run_button)
+		layout.addWidget(agent_panel, 0)
 
 	def _refresh_models(self) -> None:
 		self.client.models_dir = self.models_dir_edit.text().strip()
@@ -335,6 +349,42 @@ class MainWindow(QtWidgets.QMainWindow):
 	def _on_error(self, message: str) -> None:
 		self.progress_label.setText("")
 		QtWidgets.QMessageBox.critical(self, "Generation error", message)
+
+	def on_agent_run(self) -> None:
+		project_name = self.project_name_edit.text().strip()
+		if not project_name:
+			QtWidgets.QMessageBox.warning(self, "Agent", "Please specify project_name")
+			return
+		model_name = self.model_combo.currentText().strip()
+		if not model_name:
+			QtWidgets.QMessageBox.warning(self, "Agent", "Please select a model")
+			return
+		# preload
+		try:
+			self.client.load_model(model_name, verbose=False)
+		except Exception as exc:
+			QtWidgets.QMessageBox.critical(self, "Agent", f"Model load failed: {exc}")
+			return
+		self.agent_spinner.setText("🔄 Running...")
+		self.agent_status.clear()
+		user_request = self.input_line.text().strip() or "Create a simple Android app with a button and a toast."
+		agent = AndroidAgent(models_dir=self.client.models_dir)
+
+		def on_status(msg: str) -> None:
+			self.agent_status.append(msg)
+			self.agent_status.moveCursor(QTextCursor.End)
+
+		outputs = agent.run_generation(
+			project_name=project_name,
+			system_prompt=self.system_prompt_edit.toPlainText(),
+			user_request=user_request,
+			max_tokens=int(self.max_tokens_spin.value()),
+			temp=float(self.temp_spin.value()),
+			on_status=on_status,
+		)
+		agent.write_outputs(project_name, outputs)
+		self.agent_spinner.setText("✅ Done")
+		self._on_file_selected()
 
 
 def main() -> None:
